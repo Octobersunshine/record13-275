@@ -1,10 +1,23 @@
 from datetime import datetime
-from typing import Union, Dict
+from typing import Union, Dict, Optional
 from dateutil.relativedelta import relativedelta
 
 
 class DateService:
     DATE_FORMAT = "%Y-%m-%d"
+
+    _CN_WEEKDAYS = ["星期一", "星期二", "星期三", "星期四", "星期五", "星期六", "星期日"]
+
+    FORMAT_PRESETS: Dict[str, str] = {
+        "iso": "%Y-%m-%d",
+        "cn": "%Y年%m月%d日",
+        "us": "%m/%d/%Y",
+        "eu": "%d.%m.%Y",
+        "slash": "%Y/%m/%d",
+        "compact": "%Y%m%d",
+        "long_cn": "%Y年%m月%d日",
+        "timestamp": "%Y-%m-%d %H:%M:%S",
+    }
 
     @classmethod
     def _parse_date(cls, date_str: Union[str, datetime]) -> datetime:
@@ -15,40 +28,72 @@ class DateService:
         raise TypeError(f"Unsupported date type: {type(date_str)}")
 
     @classmethod
-    def add_days(cls, date: Union[str, datetime], days: int) -> str:
+    def _resolve_format(cls, fmt: str) -> str:
+        if fmt in cls.FORMAT_PRESETS:
+            return cls.FORMAT_PRESETS[fmt]
+        return fmt
+
+    @classmethod
+    def format_date(cls, date: Union[str, datetime], fmt: str = "iso") -> str:
+        dt = cls._parse_date(date)
+        if fmt == "long_cn":
+            return f"{dt.strftime(cls.FORMAT_PRESETS['long_cn'])}{cls._CN_WEEKDAYS[dt.weekday()]}"
+        return dt.strftime(cls._resolve_format(fmt))
+
+    @classmethod
+    def format_all(cls, date: Union[str, datetime]) -> Dict[str, str]:
+        dt = cls._parse_date(date)
+        results = {}
+        for name, pattern in cls.FORMAT_PRESETS.items():
+            if name == "long_cn":
+                results[name] = f"{dt.strftime(pattern)}{cls._CN_WEEKDAYS[dt.weekday()]}"
+            else:
+                results[name] = dt.strftime(pattern)
+        return results
+
+    @classmethod
+    def _output(cls, dt: datetime, output_format: Optional[str] = None) -> str:
+        if output_format is None:
+            return dt.strftime(cls.DATE_FORMAT)
+        if output_format == "long_cn":
+            return f"{dt.strftime(cls.FORMAT_PRESETS['long_cn'])}{cls._CN_WEEKDAYS[dt.weekday()]}"
+        return dt.strftime(cls._resolve_format(output_format))
+
+    @classmethod
+    def add_days(cls, date: Union[str, datetime], days: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt + relativedelta(days=days)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
-    def subtract_days(cls, date: Union[str, datetime], days: int) -> str:
+    def subtract_days(cls, date: Union[str, datetime], days: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt - relativedelta(days=days)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
-    def add_months(cls, date: Union[str, datetime], months: int) -> str:
+    def add_months(cls, date: Union[str, datetime], months: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt + relativedelta(months=months)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
-    def subtract_months(cls, date: Union[str, datetime], months: int) -> str:
+    def subtract_months(cls, date: Union[str, datetime], months: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt - relativedelta(months=months)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
-    def add_years(cls, date: Union[str, datetime], years: int) -> str:
+    def add_years(cls, date: Union[str, datetime], years: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt + relativedelta(years=years)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
-    def subtract_years(cls, date: Union[str, datetime], years: int) -> str:
+    def subtract_years(cls, date: Union[str, datetime], years: int, output_format: Optional[str] = None) -> str:
         dt = cls._parse_date(date)
         result = dt - relativedelta(years=years)
-        return result.strftime(cls.DATE_FORMAT)
+        return cls._output(result, output_format)
 
     @classmethod
     def days_between(cls, date1: Union[str, datetime], date2: Union[str, datetime]) -> int:
@@ -69,6 +114,8 @@ class DateService:
 
 
 def main():
+    presets = list(DateService.FORMAT_PRESETS.keys())
+
     print("=== 日期计算服务 ===")
     print("1. 日期加 N 天")
     print("2. 日期减 N 天")
@@ -78,10 +125,12 @@ def main():
     print("6. 日期减 N 年")
     print("7. 计算两个日期相差天数")
     print("8. 计算两个日期相差（年/月/日）")
-    print("9. 退出")
+    print("9. 日期格式化（单格式）")
+    print("10. 日期格式化（全格式预览）")
+    print("0. 退出")
 
     while True:
-        choice = input("\n请选择操作 (1-9): ").strip()
+        choice = input("\n请选择操作 (0-10): ").strip()
 
         try:
             if choice == "1":
@@ -133,6 +182,20 @@ def main():
                 print(f"两个日期相差 {diff['years']} 年 {diff['months']} 月 {diff['days']} 天")
 
             elif choice == "9":
+                date = input("请输入日期 (YYYY-MM-DD): ").strip()
+                print(f"可用格式: {', '.join(presets)}，或输入自定义 strftime 格式")
+                fmt = input("请输入格式名称或格式串: ").strip()
+                result = DateService.format_date(date, fmt)
+                print(f"格式化结果: {result}")
+
+            elif choice == "10":
+                date = input("请输入日期 (YYYY-MM-DD): ").strip()
+                results = DateService.format_all(date)
+                print(f"日期 {date} 的全格式预览:")
+                for name, value in results.items():
+                    print(f"  {name:12s} -> {value}")
+
+            elif choice == "0":
                 print("再见!")
                 break
 
